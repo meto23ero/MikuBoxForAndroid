@@ -3,15 +3,11 @@ package com.neko.expandable.layout;
 import android.animation.Animator;
 import android.animation.ValueAnimator;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.content.res.TypedArray;
-import android.os.Bundle;
-import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.animation.Interpolator;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import io.nekohasekai.sagernet.R; 
 
 public class ExpandableView extends FrameLayout {
@@ -23,12 +19,8 @@ public class ExpandableView extends FrameLayout {
         int EXPANDED = 3;
     }
 
-    public static final String KEY_SUPER_STATE = "super_state";
-    public static final String KEY_EXPANSION = "expansion";
-
     public static final int HORIZONTAL = 0;
     public static final int VERTICAL = 1;
-
     private static final int DEFAULT_DURATION = 300;
 
     private int duration = DEFAULT_DURATION;
@@ -62,12 +54,10 @@ public class ExpandableView extends FrameLayout {
     private OnExpansionUpdateListener listener;
 
     public ExpandableView(Context context) { this(context, null); }
-
     public ExpandableView(Context context, AttributeSet attrs) {
         super(context, attrs);
         init(context, attrs);
     }
-    
     public ExpandableView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         init(context, attrs);
@@ -93,28 +83,18 @@ public class ExpandableView extends FrameLayout {
         int width = getMeasuredWidth();
         int height = getMeasuredHeight();
         int size = (orientation == HORIZONTAL) ? width : height;
-
         setVisibility(expansion == 0 && size == 0 ? GONE : VISIBLE);
-
         int expansionDelta = size - Math.round(size * expansion);
-        
         if (parallax > 0) {
             float parallaxDelta = expansionDelta * parallax;
             for (int i = 0; i < getChildCount(); i++) {
                 View child = getChildAt(i);
-                if (orientation == HORIZONTAL) {
-                    child.setTranslationX(-parallaxDelta);
-                } else {
-                    child.setTranslationY(-parallaxDelta);
-                }
+                if (orientation == HORIZONTAL) child.setTranslationX(-parallaxDelta);
+                else child.setTranslationY(-parallaxDelta);
             }
         }
-
-        if (orientation == HORIZONTAL) {
-            setMeasuredDimension(width - expansionDelta, height);
-        } else {
-            setMeasuredDimension(width, height - expansionDelta);
-        }
+        if (orientation == HORIZONTAL) setMeasuredDimension(width - expansionDelta, height);
+        else setMeasuredDimension(width, height - expansionDelta);
     }
 
     public boolean isExpanded() { return state == State.EXPANDING || state == State.EXPANDED; }
@@ -122,7 +102,8 @@ public class ExpandableView extends FrameLayout {
     public void toggle() { toggle(true); }
 
     public void toggle(boolean animate) {
-        if (isExpanded()) collapse(animate); else expand(animate);
+        if (isExpanded()) setExpanded(false, animate); 
+        else setExpanded(true, animate);
     }
 
     public void expand() { setExpanded(true, true); }
@@ -141,7 +122,6 @@ public class ExpandableView extends FrameLayout {
         else if (expansion == 1) state = State.EXPANDED;
         else if (delta < 0) state = State.COLLAPSING;
         else if (delta > 0) state = State.EXPANDING;
-
         setVisibility(state == State.COLLAPSED ? GONE : VISIBLE);
         this.expansion = expansion;
         requestLayout();
@@ -149,7 +129,7 @@ public class ExpandableView extends FrameLayout {
     }
 
     private void animateSize(int targetExpansion) {
-        if (animator != null) { animator.cancel(); }
+        if (animator != null) animator.cancel();
         animator = ValueAnimator.ofFloat(expansion, targetExpansion);
         animator.setInterpolator(interpolator);
         animator.setDuration(duration);
@@ -160,9 +140,7 @@ public class ExpandableView extends FrameLayout {
 
     public void setOrientation(int orientation) { this.orientation = orientation; }
 
-    public interface OnExpansionUpdateListener {
-        void onExpansionUpdate(float expansion, int state);
-    }
+    public interface OnExpansionUpdateListener { void onExpansionUpdate(float expansion, int state); }
 
     private class ExpansionListener implements Animator.AnimatorListener {
         private int targetExpansion;
