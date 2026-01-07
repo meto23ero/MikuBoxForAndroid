@@ -1,4 +1,4 @@
-name: Build and Release Debug
+name: Build and Release
 
 on:
   push:
@@ -21,7 +21,6 @@ env:
   GO_VERSION: '^1.25'
 
 jobs:
-  # Job 1: LibCore native build (cache ile hızlandırılmış)
   build-libcore:
     name: Build LibCore (Native)
     runs-on: ubuntu-latest
@@ -34,15 +33,15 @@ jobs:
 
       - name: Generate status files for cache
         run: |
-          find buildScript libcore/*.sh -type f | xargs cat | sha1sum > golang_status
-          git ls-files libcore | xargs cat | sha1sum > libcore_status
+          find buildScript libcore/*.sh -type f 2>/dev/null | xargs cat | sha1sum > golang_status || echo "no-buildscript" > golang_status
+          git ls-files libcore 2>/dev/null | xargs cat | sha1sum > libcore_status || echo "no-libcore" > libcore_status
 
       - name: Restore LibCore cache
         id: cache-libcore
         uses: actions/cache@v4
         with:
           path: app/libs/libcore.aar
-          key: libcore-${{ runner.os }}-${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
+          key: libcore-${{ runner.os }}-${{ hashFiles('golang_status', 'libcore_status') }}
 
       - name: Setup Golang
         if: steps.cache-libcore.outputs.cache-hit != 'true'
@@ -53,7 +52,9 @@ jobs:
 
       - name: Build LibCore
         if: steps.cache-libcore.outputs.cache-hit != 'true'
-        run: ./run lib core
+        run: |
+          chmod +x run
+          ./run lib core
 
       - name: Upload LibCore artifact
         uses: actions/upload-artifact@v4
@@ -62,7 +63,6 @@ jobs:
           path: app/libs/libcore.aar
           retention-days: 1
 
-  # Job 2: APK build (unsigned - no signature required)
   build-apk:
     name: Build APK (Unsigned)
     needs: build-libcore
@@ -78,16 +78,16 @@ jobs:
 
       - name: Generate status files
         run: |
-          find buildScript libcore/*.sh -type f | xargs cat | sha1sum > golang_status
-          git ls-files libcore | xargs cat | sha1sum > libcore_status
+          find buildScript libcore/*.sh -type f 2>/dev/null | xargs cat | sha1sum > golang_status || echo "no-buildscript" > golang_status
+          git ls-files libcore 2>/dev/null | xargs cat | sha1sum > libcore_status || echo "no-libcore" > libcore_status
 
       - name: Restore LibCore cache
         uses: actions/cache@v4
         with:
           path: app/libs/libcore.aar
-          key: libcore-${{ runner.os }}-${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
+          key: libcore-${{ runner.os }}-${{ hashFiles('golang_status', 'libcore_status') }}
 
-      - name: Download LibCore artifact (if cache miss)
+      - name: Download LibCore artifact (fallback)
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
@@ -107,13 +107,17 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-oss-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
           restore-keys: |
-            gradle-oss-${{ runner.os }}-
+            gradle-${{ runner.os }}-
 
       - name: Configure Android SDK
         run: |
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
+
+      - name: Suppress Java deprecation warnings
+        run: |
+          echo "android.javaCompile.suppressSourceTargetDeprecationWarning=true" >> gradle.properties
 
       - name: Build APK (Debug/Unsigned)
         env:
@@ -121,6 +125,7 @@ jobs:
           _JAVA_OPTIONS: "-Xmx3g -XX:MaxMetaspaceSize=512m"
         run: |
           chmod +x gradlew
+          chmod +x run
           ./run init action gradle
           
           # Build all variants
@@ -131,31 +136,32 @@ jobs:
             --stacktrace
           
           # Verify APK creation
-          APK_COUNT=$(find app/build/outputs/apk -name "*.apk" | wc -l)
+          echo "🔍 Searching for APK files..."
+          find app/build/outputs/apk -type f -name "*.apk"
+          
+          APK_COUNT=$(find app/build/outputs/apk -type f -name "*.apk" | wc -l)
           if [ "$APK_COUNT" -eq 0 ]; then
             echo "❌ ERROR: No APK files generated!"
             exit 1
           fi
           
           echo "✅ Successfully built $APK_COUNT APK(s)"
-          ls -lh app/build/outputs/apk/**/*.apk
+
+      - name: List APK details
+        run: |
+          echo "📦 APK Files:"
+          find app/build/outputs/apk -type f -name "*.apk" -exec ls -lh {} \;
 
       - name: Prepare APK files
         run: |
           mkdir -p release-apks
           find app/build/outputs/apk -type f -name "*.apk" -exec cp {} release-apks/ \;
           
-          # Rename APKs for clarity
-          cd release-apks
-          for apk in *.apk; do
-            if [[ "$apk" =~ (arm64-v8a|armeabi-v7a|x86|x86_64|universal) ]]; then
-              echo "📦 Found: $apk"
-            fi
-          done
+          echo "📦 Prepared APKs:"
+          ls -lh release-apks/
 
       # ============================================
       # ARTIFACTS UPLOAD (No ZIP, direct APKs)
-      # Only when release_tag is empty
       # ============================================
       - name: Upload APKs as artifacts
         if: github.event.inputs.release_tag == ''
@@ -164,11 +170,10 @@ jobs:
           name: preview-apks
           path: release-apks/*.apk
           retention-days: 7
-          compression-level: 0  # No ZIP compression
+          compression-level: 0
 
       # ============================================
       # GITHUB RELEASE (Direct APKs)
-      # Only when release_tag is provided
       # ============================================
       - name: Create GitHub Release
         if: github.event.inputs.release_tag != ''
@@ -180,8 +185,9 @@ jobs:
             ## 🚀 Release ${{ github.event.inputs.release_tag }}
             
             ### 📱 Download APKs
-            **Note**: These are unsigned debug builds. Choose the APK for your device:
+            **Note**: These are unsigned debug builds.
             
+            Choose the APK for your device:
             - **arm64-v8a** - Modern 64-bit ARM devices (Most common) ⭐
             - **armeabi-v7a** - Older 32-bit ARM devices
             - **x86** - Intel/AMD 32-bit devices
@@ -191,7 +197,7 @@ jobs:
             ### ℹ️ Build Information
             - **Commit**: `${{ github.sha }}`
             - **Branch**: `${{ github.ref_name }}`
-            - **Build Date**: ${{ github.run_id }}
+            - **Build Date**: ${{ github.event.repository.updated_at }}
             - **Java**: ${{ env.JAVA_VERSION }}
             - **Go**: ${{ env.GO_VERSION }}
             
@@ -206,7 +212,7 @@ jobs:
             - May show security warnings during installation (this is normal)
             - For production use, please build signed release versions
             
-            > **Tip**: If unsure which version to download, use `universal.apk`
+            > **Tip**: If unsure which version to download, use the `universal` variant
           draft: false
           prerelease: false
           make_latest: true
@@ -226,5 +232,4 @@ jobs:
         if: always()
         run: |
           rm -rf release-apks
-          rm -rf app/build/outputs
           
