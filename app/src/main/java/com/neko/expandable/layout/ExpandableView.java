@@ -29,12 +29,12 @@ public class ExpandableView extends FrameLayout {
     public static final int HORIZONTAL = 0;
     public static final int VERTICAL = 1;
 
-    private static final int DEFAULT_DURATION = 300; // Akıcılık için 300ms idealdir
+    private static final int DEFAULT_DURATION = 300;
 
     private int duration = DEFAULT_DURATION;
-    private float parallax = 1f; [span_2](start_span)// İçeriğin kayma efekti[span_2](end_span)
+    private float parallax = 1f;
     private float expansion;
-    private int orientation = VERTICAL; [span_3](start_span)// Varsayılan dikey[span_3](end_span)
+    private int orientation = VERTICAL;
     private int state;
     
     private final float[] ff = {0.0f, 0.0001f, 0.0002f, 0.0005f, 0.0009f, 0.0014f, 0.002f, 0.0027f, 0.0036f, 0.0046f, 0.0058f, 0.0071f,
@@ -56,6 +56,7 @@ public class ExpandableView extends FrameLayout {
         0.9924f, 0.9931f, 0.9937f, 0.9944f, 0.9949f, 0.9955f, 0.996f, 0.9964f, 0.9969f, 0.9973f, 0.9977f,
         0.998f, 0.9984f, 0.9986f, 0.9989f, 0.9991f, 0.9993f, 0.9995f, 0.9997f, 0.9998f, 0.9999f, 0.9999f,
         1.0f, 1.0f};
+
     private Interpolator interpolator = new FastOutSlowInInterpolator(ff);
     private ValueAnimator animator;
     private OnExpansionUpdateListener listener;
@@ -93,12 +94,10 @@ public class ExpandableView extends FrameLayout {
         int height = getMeasuredHeight();
         int size = (orientation == HORIZONTAL) ? width : height;
 
-        [span_4](start_span)// Görünürlük kontrolü: Tam kapalıysa yer kaplamasın[span_4](end_span)
         setVisibility(expansion == 0 && size == 0 ? GONE : VISIBLE);
 
         int expansionDelta = size - Math.round(size * expansion);
         
-        [span_5](start_span)// Profesyonel kayma (parallax) efekti[span_5](end_span)
         if (parallax > 0) {
             float parallaxDelta = expansionDelta * parallax;
             for (int i = 0; i < getChildCount(); i++) {
@@ -118,7 +117,6 @@ public class ExpandableView extends FrameLayout {
         }
     }
 
-    // --- State Yönetimi ve Yardımcı Metotlar ---
     public boolean isExpanded() { return state == State.EXPANDING || state == State.EXPANDED; }
 
     public void toggle() { toggle(true); }
@@ -160,8 +158,11 @@ public class ExpandableView extends FrameLayout {
         animator.start();
     }
 
-    // ... Diğer getter/setter'lar (orientation, duration vb.) aynı kalabilir ...
     public void setOrientation(int orientation) { this.orientation = orientation; }
+
+    public interface OnExpansionUpdateListener {
+        void onExpansionUpdate(float expansion, int state);
+    }
 
     private class ExpansionListener implements Animator.AnimatorListener {
         private int targetExpansion;
@@ -180,10 +181,10 @@ public class ExpandableView extends FrameLayout {
         @Override public void onAnimationRepeat(Animator animation) {}
     }
 
-    // Interpolator sınıfları (Aynen korunur)
     public class FastOutSlowInInterpolator extends LookupTableInterpolator {
         public FastOutSlowInInterpolator(float[] values) { super(values); }
     }
+    
     abstract class LookupTableInterpolator implements Interpolator {
         private float[] mValues;
         private float mStepSize;
