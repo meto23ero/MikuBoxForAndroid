@@ -690,7 +690,20 @@ Tolong kasih izinnya di Settingan Sistem."</string>
     <string name="action_ok">Sip</string>
     <string name="check_update_failed">Gagal ngecek update: %1$s</string>
     <string name="update_summary">Yuk update MikuBox sayang!</string>
-    
+    <string name="create_shortcut_summary">Bikin shortcut di home screen.</string>
+    <string name="move_summary">Pindahin ke grup laen biar rapih.</string>
+    <string name="title_show_welcome_anim">Animasi Love</string>
+    <string name="summary_show_welcome_anim">Tampilin animasi Lottie pas buka aplikasi</string>
+    <string name="title_show_banner_preference">Tampilin Banner Preferensi</string>
+    <string name="summary_show_banner_preference">Tampilin atau sembunyiin banner di halaman preferensi</string>
+    <string name="pref_font_style_title">Ubah Gaya Font</string>
+    <string name="pref_font_scale_title">Ubah Ukuran Font</string>
+    <string name="pref_font_scale_summary">Ketuk untuk mereset ke ukuran font default</string>
+    <string name="reset_font_scale_title">Reset Skala Ukuran Font</string>
+    <string name="reset_font_scale_message">Reset ukuran font ke default (100)?</string>
+    <string name="display_category">Tampilan</string>
+    <string name="summary_speed_test">Cek seberapa kenceng internetmu sekarang!</string>
+    <string name="summary_free_config">Bebas utak-atik config semaumu, gratis!</string>
     
     <string name="uwu_miku_ui">Lemari Baju Miku</string>
     <string name="uwu_miku_ui_summary">Yuk, makeover Miku biar makin glowing!</string>

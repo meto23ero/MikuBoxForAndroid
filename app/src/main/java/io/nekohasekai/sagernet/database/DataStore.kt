@@ -101,6 +101,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var bannerHeight by configurationStore.stringToInt("banner_height") { 100 }
 
     var showSplashScreen by configurationStore.boolean("show_splash_screen") { true }
+    var showWelcomeAnim by configurationStore.boolean("key_show_welcome_anim") { true }
+    var showBannerPreference by configurationStore.boolean("show_banner_preference") { true }
+    
     var connectionTestWithIp by configurationStore.boolean("connection_test_with_ip") { false }
     var showIpInTwoLine by configurationStore.boolean("show_ip_in_two_line") { false }
     var categoryStyle by configurationStore.string("key_category_style_menu") { "style1" }
@@ -110,6 +113,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var showWeatherCondition by configurationStore.boolean("show_weather_condition") { true }
     var hideWeatherCity by configurationStore.boolean("hide_weather_city") { false }
     var customProfileName by configurationStore.string("custom_profile_name") { "" }
+    var appFont by configurationStore.string("app_font_pref") { "default" }
+    var fontSize by configurationStore.int("app_font_scale") { 100 }
 
     var appTLSVersion by configurationStore.string(Key.APP_TLS_VERSION)
     var enableClashAPI by configurationStore.boolean(Key.ENABLE_CLASH_API)

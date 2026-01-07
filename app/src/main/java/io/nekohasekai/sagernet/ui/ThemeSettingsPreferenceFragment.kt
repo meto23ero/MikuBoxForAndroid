@@ -25,6 +25,7 @@ import androidx.preference.PreferenceGroup
 import androidx.preference.SwitchPreference
 import com.takisoft.preferencex.PreferenceFragmentCompat
 import com.takisoft.preferencex.SimpleMenuPreference
+import androidx.preference.SeekBarPreference
 import com.yalantis.ucrop.UCrop
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
@@ -227,23 +228,29 @@ class ThemeSettingsPreferenceFragment : PreferenceFragmentCompat() {
                     val jsonStr = URL(jsonUrl).readText()
                     val jsonObject = JSONObject(jsonStr)
                     
-                    val latestVersion = jsonObject.optString("latestVersion")
+                    val remoteVersion = jsonObject.optString("latestVersion")
+                    val remotePreVersion = jsonObject.optString("latestPreVersion") 
                     val downloadUrl = jsonObject.optString("url")
                     
-                    val installedVersionName = BuildConfig.VERSION_NAME
+                    val localVersion = BuildConfig.VERSION_NAME
+                    val localPreVersion = BuildConfig.PRE_VERSION_NAME
                     
-                    var fullInstalledVersion = installedVersionName
-                    if (BuildConfig.PRE_VERSION_NAME.isNotEmpty()) {
-                        fullInstalledVersion += "-" + BuildConfig.PRE_VERSION_NAME
-                    }
+                    var hasUpdate = false
 
-                    val hasUpdate = latestVersion.isNotEmpty() && isNewerVersion(latestVersion, installedVersionName)
+                    if (remoteVersion.isNotEmpty() && remoteVersion != localVersion) {
+                        hasUpdate = true
+                    } else if (remotePreVersion.isNotEmpty() && remotePreVersion != localPreVersion) {
+                        hasUpdate = true
+                    }
                     
+                    val displayRemote = if (remotePreVersion.isNotEmpty()) "$remoteVersion-$remotePreVersion" else remoteVersion
+                    val displayLocal = if (localPreVersion.isNotEmpty()) "$localVersion-$localPreVersion" else localVersion
+
                     activity?.runOnUiThread {
                         if (hasUpdate) {
                              MaterialAlertDialogBuilder(requireContext())
                                 .setTitle(R.string.update_available_title)
-                                .setMessage(getString(R.string.update_available_message, latestVersion, fullInstalledVersion))
+                                .setMessage(getString(R.string.update_available_message, displayRemote, displayLocal))
                                 .setPositiveButton(R.string.action_update_now) { _, _ ->
                                     try {
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
@@ -257,7 +264,7 @@ class ThemeSettingsPreferenceFragment : PreferenceFragmentCompat() {
                         } else {
                             MaterialAlertDialogBuilder(requireContext())
                                 .setTitle(R.string.update_not_available_title)
-                                .setMessage(getString(R.string.update_not_available_message, fullInstalledVersion))
+                                .setMessage(getString(R.string.update_not_available_message, displayLocal))
                                 .setPositiveButton(R.string.action_ok, null)
                                 .showBlur()
                         }
@@ -338,6 +345,46 @@ class ThemeSettingsPreferenceFragment : PreferenceFragmentCompat() {
             dynamicSwitch.isChecked = false
             dynamicSwitch.summary = getString(R.string.dynamic_theme_min_android_12)
             appTheme.isEnabled = true
+        }
+        
+        val appFont = findPreference<SimpleMenuPreference>("app_font_pref")
+        appFont?.setOnPreferenceChangeListener { _, newValue ->
+            DataStore.appFont = newValue as String
+            requireActivity().recreate()
+            true
+        }
+        
+        val fontScalePref = findPreference<SeekBarPreference>("app_font_scale")
+        fontScalePref?.apply {
+            min = 50
+            max = 150
+            seekBarIncrement = 5
+            value = DataStore.fontSize
+            showSeekBarValue = true 
+   
+            setOnPreferenceChangeListener { _, newValue ->
+                val newSize = newValue as Int
+                DataStore.fontSize = newSize
+                requireActivity().recreate()
+                true
+            }
+            
+            setOnPreferenceClickListener {
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.reset_font_scale_title)
+                    .setMessage(R.string.reset_font_scale_message)
+                    .setPositiveButton(R.string.yes) { _, _ ->
+                        val defaultSize = 100
+                        if (DataStore.fontSize != defaultSize) {
+                            DataStore.fontSize = defaultSize
+                            value = defaultSize
+                            requireActivity().recreate()
+                        }
+                    }
+                    .setNegativeButton(R.string.no, null)
+                    .showBlur()
+                true
+            }
         }
 
         val boldFontSwitch = findPreference<SwitchPreference>("bold_font_switch")
@@ -495,6 +542,7 @@ class ThemeSettingsPreferenceFragment : PreferenceFragmentCompat() {
                 "id" -> getString(R.string.language_id_display_name)
                 "zh-Hans-CN" -> getString(R.string.language_zh_Hans_CN_display_name)
                 "tr-TR" -> getString(R.string.language_tr_display_name)
+                "ja-JP" -> getString(R.string.language_ja_display_name)
                 else -> Locale.forLanguageTag(code).displayName
             }
         }
@@ -662,6 +710,16 @@ class ThemeSettingsPreferenceFragment : PreferenceFragmentCompat() {
             }
             true
         }
+        
+        val bannerPreferenceToggle = findPreference<SwitchPreference>("show_banner_preference")
+        bannerPreferenceToggle?.apply {
+            isChecked = DataStore.showBannerPreference
+            setOnPreferenceChangeListener { _, newValue ->
+                val isEnabled = newValue as Boolean
+                DataStore.showBannerPreference = isEnabled
+                true
+            }
+        }
 
         val changePreferenceBannerPref = findPreference<Preference>("action_change_preference_banner_image")
         changePreferenceBannerPref?.setOnPreferenceClickListener {
@@ -707,6 +765,16 @@ class ThemeSettingsPreferenceFragment : PreferenceFragmentCompat() {
             setOnPreferenceChangeListener { _: Preference, newValue: Any ->
                 val showSplash = newValue as Boolean
                 DataStore.showSplashScreen = showSplash
+                true
+            }
+        }
+        
+        val welcomeAnimSwitch: SwitchPreference? = findPreference("key_show_welcome_anim")
+        welcomeAnimSwitch?.apply {
+            isChecked = DataStore.showWelcomeAnim
+            setOnPreferenceChangeListener { _, newValue ->
+                val isEnabled = newValue as Boolean
+                DataStore.showWelcomeAnim = isEnabled
                 true
             }
         }
@@ -973,28 +1041,5 @@ class ThemeSettingsPreferenceFragment : PreferenceFragmentCompat() {
                 cacheFile.delete()
             }
         }
-    }
-
-    private fun isNewerVersion(remoteVersion: String, localVersion: String): Boolean {
-        val remoteClean = remoteVersion.replace(Regex("[^0-9.]"), "")
-        val localClean = localVersion.replace(Regex("[^0-9.]"), "")
-
-        val remoteParts = remoteClean.split(".")
-        val localParts = localClean.split(".")
-
-        val length = maxOf(remoteParts.size, localParts.size)
-
-        for (i in 0 until length) {
-            val remotePart = remoteParts.getOrNull(i)?.toIntOrNull() ?: 0
-            val localPart = localParts.getOrNull(i)?.toIntOrNull() ?: 0
-
-            if (remotePart > localPart) {
-                return true
-            }
-            if (remotePart < localPart) {
-                return false
-            }
-        }
-        return false
     }
 }
