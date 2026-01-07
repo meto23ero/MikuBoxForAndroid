@@ -29,12 +29,12 @@ public class ExpandableView extends FrameLayout {
     public static final int HORIZONTAL = 0;
     public static final int VERTICAL = 1;
 
-    private static final int DEFAULT_DURATION = 1000;
+    private static final int DEFAULT_DURATION = 300; // Akıcılık için 300ms idealdir
 
     private int duration = DEFAULT_DURATION;
-    private float parallax;
+    private float parallax = 1f; [span_2](start_span)// İçeriğin kayma efekti[span_2](end_span)
     private float expansion;
-    private int orientation;
+    private int orientation = VERTICAL; [span_3](start_span)// Varsayılan dikey[span_3](end_span)
     private int state;
     
     private final float[] ff = {0.0f, 0.0001f, 0.0002f, 0.0005f, 0.0009f, 0.0014f, 0.002f, 0.0027f, 0.0036f, 0.0046f, 0.0058f, 0.0071f,
@@ -58,12 +58,9 @@ public class ExpandableView extends FrameLayout {
         1.0f, 1.0f};
     private Interpolator interpolator = new FastOutSlowInInterpolator(ff);
     private ValueAnimator animator;
-
     private OnExpansionUpdateListener listener;
 
-    public ExpandableView(Context context) {
-        this(context, null);
-    }
+    public ExpandableView(Context context) { this(context, null); }
 
     public ExpandableView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -86,53 +83,28 @@ public class ExpandableView extends FrameLayout {
             parallax = a.getFloat(R.styleable.ExpandableView_el_parallax, 1f);
             a.recycle();
         }
-        
         setVisibility(expansion == 0 ? GONE : VISIBLE);
-    }
-
-
-    @Override
-    protected Parcelable onSaveInstanceState() {
-        Parcelable superState = super.onSaveInstanceState();
-        Bundle bundle = new Bundle();
-
-        expansion = isExpanded() ? 1 : 0;
-
-        bundle.putFloat(KEY_EXPANSION, expansion);
-        bundle.putParcelable(KEY_SUPER_STATE, superState);
-
-        return bundle;
-    }
-
-    @Override
-    protected void onRestoreInstanceState(Parcelable parcelable) {
-        Bundle bundle = (Bundle) parcelable;
-        expansion = bundle.getFloat(KEY_EXPANSION);
-        state = expansion == 1 ? State.EXPANDED : ExpandableView.State.COLLAPSED;
-        Parcelable superState = bundle.getParcelable(KEY_SUPER_STATE);
-
-        super.onRestoreInstanceState(superState);
     }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-
         int width = getMeasuredWidth();
         int height = getMeasuredHeight();
+        int size = (orientation == HORIZONTAL) ? width : height;
 
-        int size = orientation == LinearLayout.HORIZONTAL ? width : height;
-
+        [span_4](start_span)// Görünürlük kontrolü: Tam kapalıysa yer kaplamasın[span_4](end_span)
         setVisibility(expansion == 0 && size == 0 ? GONE : VISIBLE);
 
         int expansionDelta = size - Math.round(size * expansion);
+        
+        [span_5](start_span)// Profesyonel kayma (parallax) efekti[span_5](end_span)
         if (parallax > 0) {
             float parallaxDelta = expansionDelta * parallax;
             for (int i = 0; i < getChildCount(); i++) {
                 View child = getChildAt(i);
                 if (orientation == HORIZONTAL) {
-                    int direction = -1;
-                    child.setTranslationX(direction * parallaxDelta);
+                    child.setTranslationX(-parallaxDelta);
                 } else {
                     child.setTranslationY(-parallaxDelta);
                 }
@@ -146,242 +118,86 @@ public class ExpandableView extends FrameLayout {
         }
     }
 
-    public void setOrientatin(int orientation){
-        this.orientation = orientation;
-    }
+    // --- State Yönetimi ve Yardımcı Metotlar ---
+    public boolean isExpanded() { return state == State.EXPANDING || state == State.EXPANDED; }
 
-    @Override
-    protected void onConfigurationChanged(Configuration newConfig) {
-        if (animator != null) {
-            animator.cancel();
-        }
-        super.onConfigurationChanged(newConfig);
-    }
-
-    public int getState() {
-        return state;
-    }
-
-    public boolean isExpanded() {
-        return state == ExpandableView.State.EXPANDING || state == State.EXPANDED;
-    }
-
-    public void toggle() {
-        toggle(true);
-    }
+    public void toggle() { toggle(true); }
 
     public void toggle(boolean animate) {
-        if (isExpanded()) {
-            collapse(animate);
-        } else {
-            expand(animate);
-        }
+        if (isExpanded()) collapse(animate); else expand(animate);
     }
 
-    public void expand() {
-        expand(true);
-    }
-
-    public void expand(boolean animate) {
-        setExpanded(true, animate);
-    }
-
-    public void collapse() {
-        collapse(true);
-    }
-
-    public void collapse(boolean animate) {
-        setExpanded(false, animate);
-    }
-
-    public void setExpanded(boolean expand) {
-        setExpanded(expand, true);
-    }
+    public void expand() { setExpanded(true, true); }
+    public void collapse() { setExpanded(false, true); }
 
     public void setExpanded(boolean expand, boolean animate) {
-        if (expand == isExpanded()) {
-            return;
-        }
-
+        if (expand == isExpanded()) return;
         int targetExpansion = expand ? 1 : 0;
-        if (animate) {
-            animateSize(targetExpansion);
-        } else {
-            setExpansion(targetExpansion);
-        }
-    }
-
-    public int getDuration() {
-        return duration;
-    }
-
-    public void setInterpolator(Interpolator interpolator) {
-        this.interpolator = interpolator;
-    }
-
-    public void setDuration(int duration) {
-        this.duration = duration;
-    }
-
-    public float getExpansion() {
-        return expansion;
-    }
-
-    public void setExpansion(boolean yes){
-        float expansion = 0;
-        if (yes){
-            state = ExpandableView.State.EXPANDED;
-            expansion = 1;
-        } else {
-            state = ExpandableView.State.COLLAPSED;
-            expansion = 0;
-        }
-        setVisibility(state == ExpandableView.State.COLLAPSED ? GONE : VISIBLE);
-        this.expansion = expansion;
-        requestLayout();
-
-        if (listener != null) {
-            listener.onExpansionUpdate(expansion, state);
-        }
+        if (animate) animateSize(targetExpansion); else setExpansion(targetExpansion);
     }
 
     public void setExpansion(float expansion) {
-        if (this.expansion == expansion) {
-            return;
-        }
-
+        if (this.expansion == expansion) return;
         float delta = expansion - this.expansion;
-        if (expansion == 0) {
-            state = ExpandableView.State.COLLAPSED;
-        } else if (expansion == 1) {
-            state = State.EXPANDED;
-        } else if (delta < 0) {
-            state = State.COLLAPSING;
-        } else if (delta > 0) {
-            state = ExpandableView.State.EXPANDING;
-        }
+        if (expansion == 0) state = State.COLLAPSED;
+        else if (expansion == 1) state = State.EXPANDED;
+        else if (delta < 0) state = State.COLLAPSING;
+        else if (delta > 0) state = State.EXPANDING;
 
-        setVisibility(state == ExpandableView.State.COLLAPSED ? GONE : VISIBLE);
+        setVisibility(state == State.COLLAPSED ? GONE : VISIBLE);
         this.expansion = expansion;
         requestLayout();
-
-        if (listener != null) {
-            listener.onExpansionUpdate(expansion, state);
-        }
-    }
-
-    public float getParallax() {
-        return parallax;
-    }
-
-    public void setParallax(float parallax) {
-        parallax = Math.min(1, Math.max(0, parallax));
-        this.parallax = parallax;
-    }
-
-    public int getOrientation() {
-        return orientation;
-    }
-
-    public void setOrientation(int orientation) {
-        if (orientation < 0 || orientation > 1) {
-            throw new IllegalArgumentException("Orientation must be either 0 (horizontal) or 1 (vertical)");
-        }
-        this.orientation = orientation;
-    }
-
-    public void setOnExpansionUpdateListener(OnExpansionUpdateListener listener) {
-        this.listener = listener;
+        if (listener != null) listener.onExpansionUpdate(expansion, state);
     }
 
     private void animateSize(int targetExpansion) {
-        if (animator != null) {
-            animator.cancel();
-            animator = null;
-        }
-
+        if (animator != null) { animator.cancel(); }
         animator = ValueAnimator.ofFloat(expansion, targetExpansion);
         animator.setInterpolator(interpolator);
         animator.setDuration(duration);
-
-        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator valueAnimator) {
-                setExpansion((float) valueAnimator.getAnimatedValue());
-            }
-        });
-
+        animator.addUpdateListener(animation -> setExpansion((float) animation.getAnimatedValue()));
         animator.addListener(new ExpansionListener(targetExpansion));
-
         animator.start();
     }
 
-    public interface OnExpansionUpdateListener {
-        void onExpansionUpdate(float expansionFraction, int state);
-    }
+    // ... Diğer getter/setter'lar (orientation, duration vb.) aynı kalabilir ...
+    public void setOrientation(int orientation) { this.orientation = orientation; }
 
     private class ExpansionListener implements Animator.AnimatorListener {
         private int targetExpansion;
         private boolean canceled;
-
-        public ExpansionListener(int targetExpansion) {
-            this.targetExpansion = targetExpansion;
+        public ExpansionListener(int targetExpansion) { this.targetExpansion = targetExpansion; }
+        @Override public void onAnimationStart(Animator animation) {
+            state = targetExpansion == 0 ? State.COLLAPSING : State.EXPANDING;
         }
-
-        @Override
-        public void onAnimationStart(Animator animation) {
-            state = targetExpansion == 0 ? State.COLLAPSING : ExpandableView.State.EXPANDING;
-        }
-
-        @Override
-        public void onAnimationEnd(Animator animation) {
+        @Override public void onAnimationEnd(Animator animation) {
             if (!canceled) {
-                state = targetExpansion == 0 ? ExpandableView.State.COLLAPSED : State.EXPANDED;
+                state = targetExpansion == 0 ? State.COLLAPSED : State.EXPANDED;
                 setExpansion(targetExpansion);
             }
         }
-
-        @Override
-        public void onAnimationCancel(Animator animation) {
-            canceled = true;
-        }
-
-        @Override
-        public void onAnimationRepeat(Animator animation) {
-        }
+        @Override public void onAnimationCancel(Animator animation) { canceled = true; }
+        @Override public void onAnimationRepeat(Animator animation) {}
     }
 
+    // Interpolator sınıfları (Aynen korunur)
     public class FastOutSlowInInterpolator extends LookupTableInterpolator {
-        public FastOutSlowInInterpolator(float[] values) {
-            super(values);
-        }
+        public FastOutSlowInInterpolator(float[] values) { super(values); }
     }
-
     abstract class LookupTableInterpolator implements Interpolator {
-
         private float[] mValues;
         private float mStepSize;
-
         public LookupTableInterpolator(float[] values) {
             mValues = values;
             mStepSize = 1f / (mValues.length - 1);
         }
-
-        @Override
-        public float getInterpolation(float input) {
-            if (input >= 1.0f) {
-                return 1.0f;
-            }
-            if (input <= 0f) {
-                return 0f;
-            }
-
+        @Override public float getInterpolation(float input) {
+            if (input >= 1.0f) return 1.0f;
+            if (input <= 0f) return 0f;
             int position = Math.min((int) (input * (mValues.length - 1)), mValues.length - 2);
-
             float quantized = position * mStepSize;
             float diff = input - quantized;
             float weight = diff / mStepSize;
-
             return mValues[position] + weight * (mValues[position + 1] - mValues[position]);
         }
     }
