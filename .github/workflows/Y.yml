@@ -55,37 +55,44 @@ jobs:
       - name: Gradle cache
         uses: actions/cache@v4
         with:
-          path: ~/.gradle
-          key: gradle-oss-${{ hashFiles('**/*.gradle.kts') }}
+          path: ~/.gradle/caches
+          key: gradle-oss-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
 
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21' # Gradle 9.1 için Java 21 önerilir
           distribution: 'temurin'
+          cache: 'gradle'
 
       - name: Gradle Build
         env:
           BUILD_PLUGIN: none
+          # CI ortamında bellek yönetimi için kritik ayarlar
+          _JAVA_OPTIONS: "-Xmx3g -XX:MaxMetaspaceSize=512m" 
         run: |
-          # SDK ve NDK yollarını hazırla
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           
-          # Başlatma scriptini çalıştır
+          chmod +x gradlew
           ./run init action gradle
           
-          # İmza gerektirmeyen assemblePreviewDebug veya assembleDebug kullanın
-          # Eğer release istiyorsanız ama key yoksa assemblePreviewRelease yine de çalışabilir 
-          # ancak unsigned (imzasız) APK üretir.
-          ./gradlew app:assemblePreviewDebug
+          # --no-daemon: Çökmeleri engeller
+          # --no-parallel: Bellek kullanımını düşürür
+          # --stacktrace: Hata detayını gösterir
+          ./gradlew app:assemblePreviewDebug --no-daemon --no-parallel --stacktrace
           
-          # Üretilen APK'nın yolunu bul
           APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "HATA: APK dosyası üretilemedi!"
+            exit 1
+          fi
           APK_DIR=$(dirname "$APK_PATH")
           echo "APK_DIR=$APK_DIR" >> $GITHUB_ENV
 
       - name: Upload Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Preview-APK
           path: ${{ env.APK_DIR }}
+          
